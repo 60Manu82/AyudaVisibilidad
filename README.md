@@ -1,290 +1,635 @@
-# Introduction
+# 1. Promocionar un restaurante
 
-During this lab we will learn how to:
-
-- modify screens to include action buttons for editing and deleting data
-- modify screens to perform delete actions on entities.
-- create screens and forms for editing entities data.
-
-We will learn how to perform an HTTP DELETE requests from the Frontend client to the backend server. It is important to remember that to performn a DELETE Request we will need:
-
-- the URI where we will address the request,
-- the id of the entity to be removed.
-
-For instance, if we want to remove a restaurant, we will do an HTTP DELETE Request to: `/restaurants/:restaurantId`.
-
-We will learn how to perform an HTTP PUT requests from the Frontend client to the backend server. It is important to remember that to performn a PUT Request we will need:
-
-- the URI where we will address the request,
-- the id of the entity to be edited, and
-- the updated entity data.
-
-For instance, if we want to edit some restaurant, we will do an HTTP PUT Request to: `/restaurants/:restaurantId` and we will have to provide the updated restaurant data.
-
-## 0. Setup
-
-Click on "Use this template" in GitHub and "Create a new repository" to create your own repository based on this template. Afterwards, clone your own repository by opening VScode and clone the previously created repository by opening Command Palette (Ctrl+Shift+P or F1) and `Git clone` this repository, or using the terminal and running
-
-```PowerShell
-git clone <url>
-```
-
-Alternatively, you can use the _Source Control_ button in the left-sided bar and click on _Clone Repository_ button.
-
-In case you are asked if you trust the author, please select yes.
-
-It may be necessary to setup your git username by running the following commands on your terminal, in order to be able to commit and push:
-
-```PowerShell
-git config --global user.name "FIRST_NAME LAST_NAME"
-git config --global user.email "MY_NAME@example.com"
-```
-
-As in previous labs, it is needed to create a copy of the `.env.example` file, name it `.env` and include your environment variables.
-
-Open a terminal a run `npm run install:all:bash` (`npm run install:all:win` for Windows OS) to install dependencies. A folder `node_modules` will be created under the `DeliverUS-Backend` and `DeliverUS-Frontend` folders.
-
-Once you should setup your .env file for DeliverUS-Backend project. API_BASE_URL must points to your server. For instance `API_BASE_URL=http://localhost:3000`.
-
-You have to run the backend server as well. Go to your global project folder and run `start:backend`.
-
-You can then run `start:frontend`. Check that the base project is working.
-
-# 1. Action buttons for editing and removing Restaurants.
-
-We need to include some actions for editing and removing restaurants. One possible implementation is to include `Pressable` components in the card that renders each restaurant in the `RestaurantsScreen`.
-
-To this end you can include the following `Pressable` instances in the renderRestaurant function of `RestaurantScreen`:
+Añadir lo siguiente a `RestaurantController` que está en el backend, en la carpeta `controllers`
 
 ```JSX
-<Pressable
-  onPress={() => console.log(`Edit pressed for restaurantId = ${item.id}`)}
-  style={({ pressed }) => [
-    {
-      backgroundColor: pressed
-        ? GlobalStyles.brandBlueTap
-        : GlobalStyles.brandBlue
-    },
-    styles.actionButton
-  ]}>
-  <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
-    <MaterialCommunityIcons name='pencil' color={'white'} size={20}/>
-    <TextRegular textStyle={styles.text}>
-      Edit
-    </TextRegular>
-  </View>
-</Pressable>
-
-<Pressable
-  onPress={() => console.log(`Delete pressed for restaurantId = ${item.id}`)}
-  style={({ pressed }) => [
-    {
-      backgroundColor: pressed
-        ? GlobalStyles.brandPrimaryTap
-        : GlobalStyles.brandPrimary
-    },
-    styles.actionButton
-  ]}>
-  <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
-    <MaterialCommunityIcons name='delete' color={'white'} size={20}/>
-    <TextRegular textStyle={styles.text}>
-      Delete
-    </TextRegular>
-  </View>
-</Pressable>
+import Sequelize from 'sequelize'
 ```
 
-You can try both buttons and check that messages are printed in the console.
-
-# 2. Delete Modal and HTTP DELETE Request for removing Restaurants.
-
-We need to implement the delete action when the user press the corresponding button.
-
-1. Include a remove function in the `src/api/RestaurantEndpoints.js` file. The functions receives the restaurantID and is in charge of doing the request to the corresponding endpoint. You can use the following implementation:
-
-   ```Javascript
-   function remove (id) {
-     return destroy(`restaurants/${id}`)
-   }
-   ```
-
-1. Implement the needed elements in `RestaurantsScreen.js`. It is a good practice to ask for confirmation when performing undoable operations.
-
-   To this end, you have been provided with a component named `DeleteModal`. This component opens a modal window that includes:
-
-   - a button to cancel the operation
-   - a button to confirm the operation
-   - the elements passed as children of this component are rendered as the body of the modal window.
-
-   Therefore, `DeleteModal` component needs three properties:
-
-   - `isVisible`: a boolean expression that is evaluated to show or hide the modal window.
-   - `onCancel`: the function that will be run when the user presses on the cancel button.
-   - `onConfirm`: the function that will be run when the user presses the confirmation button.
-
-1. The component should be included in the return sentence of the `RestaurantsScreen` as follows:
-
-   ```JSX
-   <DeleteModal
-     isVisible={restaurantToBeDeleted !== null}
-     onCancel={() => setRestaurantToBeDeleted(null)}
-     onConfirm={() => removeRestaurant(restaurantToBeDeleted)}>
-       <TextRegular>The products of this restaurant will be deleted as well</TextRegular>
-       <TextRegular>If the restaurant has orders, it cannot be deleted.</TextRegular>
-   </DeleteModal>
-   ```
-
-1. Notice that we need to include a state object to store the restaurant that would be deleted when the user presses the delete button. Include the following state:
-
-   ```Javascript
-   const [restaurantToBeDeleted, setRestaurantToBeDeleted] = useState(null)
-   ```
-
-1. Next, we will change the `onPress` property of the delete `Pressable` previously included in the `renderRestaurant`, so when the user presses, the `restaurantToBeDeleted` state will be set with the rendered restaurant.
-
-   ```JSX
-   onPress={() => { setRestaurantToBeDeleted(item) }}
-   ```
-
-1. Finally, we need to implement the `removeRestaurant` function that is called when the user confirms the deletion. This function calls to the `remove` method of the `RestaurantEndpoints`, then refreshes the view by fetching all the restaurants again and reset the restaurantToBeDeleted state object.
-
-   ```Javascript
-   const removeRestaurant = async (restaurant) => {
-     try {
-       await remove(restaurant.id)
-       await fetchRestaurants()
-       setRestaurantToBeDeleted(null)
-       showMessage({
-         message: `Restaurant ${restaurant.name} succesfully removed`,
-         type: 'success',
-         style: GlobalStyles.flashStyle,
-         titleStyle: GlobalStyles.flashTextStyle
-       })
-     } catch (error) {
-       console.log(error)
-       setRestaurantToBeDeleted(null)
-       showMessage({
-         message: `Restaurant ${restaurant.name} could not be removed.`,
-         type: 'error',
-         style: GlobalStyles.flashStyle,
-         titleStyle: GlobalStyles.flashTextStyle
-       })
-     }
-   }
-   ```
-
-Please, check that restaurants are deleted after this implementation is done.
-
-# 3. Edit Form and HTTP PUT Request for editing Restaurants.
-
-We need to implement the update action when the user press the corresponding button. To this end, we will complete the implementation of the `EditRestaurantScreen.js`. This component should:
-
-- receive the `restaurantId` to be edited as a route param `route.params.id`
-- fetch the details of that restaurant from backend.
-- store the fetched restaurant in a state object
-- update the initialRestaurantValues of the form
-- when the user presses the button labelled with edit, validates the data and eventually send an HTTP PUT Request to the backend.
-- if the update is successful, sends the user back to the `RestaurantsScreen.js`
-
-Let's complete the implementation:
-
-1. Include an update function in the `src/api/RestaurantEndpoints.js` file. The functions receives the restaurantID and the updated restaurant data, and is in charge of doing the request to the corresponding endpoint. You can use the following implementation:
-
-   ```Javascript
-   function update (id, data) {
-     return put(`restaurants/${id}`, data)
-   }
-   ```
-
-1. Modify the `onPress` action of the Edit `Pressable` at the `renderRestaurant`of the `RestaurantsScreen.js` component to navigate to this edit screen including the id of the restaurant. You can use the following:
-
-   ```JSX
-   onPress={() => navigation.navigate('EditRestaurantScreen', { id: item.id })}
-   ```
-
-1. At the `EditRestaurantScreen` import the `update` function from `RestaurantEndpoints`. Next, include state objects to store the restaurant to be fetched and the initialValues for the `Formik` edit form.
-
-   ```Javascript
-   const [restaurant, setRestaurant] = useState({})
-
-   const [initialRestaurantValues, setInitialRestaurantValues] = useState({ name: null, description: null, address: null, postalCode: null, url: null, shippingCosts: null, email: null, phone: null, restaurantCategoryId: null, logo: null, heroImage: null })
-   ```
-
-1. Include an effect that fetches the restaurant details and set the `restaurant` state object and the `initialRestaurantValues`. You can use the following implementation:
-
-   ```Javascript
-   useEffect(() => {
-     async function fetchRestaurantDetail () {
-       try {
-         const fetchedRestaurant = await getDetail(route.params.id)
-         const preparedRestaurant = prepareEntityImages(fetchedRestaurant, ['logo', 'heroImage'])
-         setRestaurant(preparedRestaurant)
-         const initialValues = buildInitialValues(preparedRestaurant, initialRestaurantValues)
-         setInitialRestaurantValues(initialValues)
-       } catch (error) {
-         showMessage({
-           message: `There was an error while retrieving restaurant details (id ${route.params.id}). ${error}`,
-           type: 'error',
-           style: GlobalStyles.flashStyle,
-           titleStyle: GlobalStyles.flashTextStyle
-         })
-       }
-     }
-     fetchRestaurantDetail()
-   }, [route])
-   ```
-
-   Notice that we have to perform some processing of the entity data. We will use a couple of functions:
-
-   - `prepareEntityImages`: receives an entity and an array of fieldNames that include images and returns the entity including the images in a form that can be rendered by `ImagePickers`.
-   - `buildInitialValues`: receives an entity and return an object of initialValues valid for the `Formik` component.
-
-1. Include the function to be run when the user presses on the submit/save button at the end of the form:
-
-   ```Javascript
-   const updateRestaurant = async (values) => {
-     setBackendErrors([])
-     try {
-       const updatedRestaurant = await update(restaurant.id, values)
-       showMessage({
-         message: `Restaurant ${updatedRestaurant.name} succesfully updated`,
-         type: 'success',
-         style: GlobalStyles.flashStyle,
-         titleStyle: GlobalStyles.flashTextStyle
-       })
-       navigation.navigate('RestaurantsScreen', { dirty: true })
-     } catch (error) {
-       console.log(error)
-       setBackendErrors(error.errors)
-     }
-   }
-   ```
-
-   Notice that after the restaurant is update, we navigate back the the `RestaurantsScreen` that will re-render the restaurants list.
-
-1. Update the `Formik` component with these properties:
-
-   ```JSX
-   enableReinitialize
-   initialValues={initialRestaurantValues}
-   onSubmit={updateRestaurant}
-   ```
-
-   The `enableReinitialize` property forces `Formik` to check for changes in the `intialRestaurantValues` assigned to the `initialValues` property.
-
-# 4. Implement Edit and Delete of Products
-
-Follow the steps of the previous exercices to implement the Edit and Deletion of products from the `RestaurantDetailScreen.js`.
-
-You will need to include the `EditProductScreen` in the `RestaurantsStack.js` as follows:
+Añadir lo siguiente a `RestaurantController` que está en el backend, en la carpeta `controllers`
 
 ```JSX
-<Stack.Screen
-  name='EditProductScreen'
-  component={EditProductScreen}
-  options={{
-    title: 'Edit Product'
-  }} />
+const currentDate = new Date() // Solution (pro)
+
+where: { // Solution (pro)
+          visibleUntil: { [Sequelize.Op.or]: [{ [Sequelize.Op.eq]: null }, { [Sequelize.Op.gt]: currentDate }] }
+        },
+```
+Dentro de 
+```JSX
+const show = async function (req, res) {
+  // Only returns PUBLIC information of restaurants
+  try {
+
+
+    const currentDate = new Date() // Solution (pro)
+
+
+    const restaurant = await Restaurant.findByPk(req.params.restaurantId, {
+      attributes: { exclude: ['userId'] },
+      include: [{
+        model: Product,
+        as: 'products',
+
+
+        where: { // Solution (pro)
+          visibleUntil: { [Sequelize.Op.or]: [{ [Sequelize.Op.eq]: null }, { [Sequelize.Op.gt]: currentDate }] }
+        },
+
+
+        include: { model: ProductCategory, as: 'productCategory' }
+      },
+      {
+        model: RestaurantCategory,
+        as: 'restaurantCategory'
+      }],
+      order: [[{ model: Product, as: 'products' }, 'order', 'ASC']]
+    }
+    )
+    // const newProducts = filterNotVisible(restaurant) // Alternative solution
+    // restaurant.setProducts(newProducts) // Alternative solution (it is important to use the set)
+    res.json(restaurant)
+  } catch (err) {
+    res.status(500).send(err)
+  }
+}
 ```
 
-Remember that the backend does not expect to receive the restaurantId of the product, since you cannot change the product from one restaurant to another.
+
+
+Añadir lo siguiente a `ProductValidation` que está en el backend, en la carpeta `controllers/validations`
+
+```JSX
+check('visibleUntil').optional().isDate().toDate(),
+  check('visibleUntil').custom((value, { req }) => {
+    const currentDate = new Date()
+    if (value && value < currentDate) {
+      return Promise.reject(new Error('The visibility must finish after the current date.'))
+    } else { return Promise.resolve() }
+  }),
+  check('availability').custom((value, { req }) => {
+    if (value === false && req.body.visibleUntil) {
+      return Promise.reject(new Error('Cannot set the availability and visibility at the same time.'))
+    } else { return Promise.resolve() }
+  })
+
+```
+Dentro de 
+```JSX
+const create = [
+  check('name').exists().isString().isLength({ min: 1, max: 255 }).trim(),
+  check('description').optional({ checkNull: true, checkFalsy: true }).isString().isLength({ min: 1 }).trim(),
+  check('price').exists().isFloat({ min: 0 }).toFloat(),
+  check('order').default(null).optional({ nullable: true }).isInt().toInt(),
+  check('availability').optional().isBoolean().toBoolean(),
+  check('productCategoryId').exists().isInt({ min: 1 }).toInt(),
+  check('restaurantId').exists().isInt({ min: 1 }).toInt(),
+  check('restaurantId').custom(checkRestaurantExists),
+  check('image').custom((value, { req }) => {
+    return checkFileIsImage(req, 'image')
+  }).withMessage('Please upload an image with format (jpeg, png).'),
+  check('image').custom((value, { req }) => {
+    return checkFileMaxSize(req, 'image', maxFileSize)
+  }).withMessage('Maximum file size of ' + maxFileSize / 1000000 + 'MB'),
+
+  // Solution
+  check('visibleUntil').optional().isDate().toDate(),
+  check('visibleUntil').custom((value, { req }) => {
+    const currentDate = new Date()
+    if (value && value < currentDate) {
+      return Promise.reject(new Error('The visibility must finish after the current date.'))
+    } else { return Promise.resolve() }
+  }),
+  check('availability').custom((value, { req }) => {
+    if (value === false && req.body.visibleUntil) {
+      return Promise.reject(new Error('Cannot set the availability and visibility at the same time.'))
+    } else { return Promise.resolve() }
+  })
+]
+```
+
+Y añadir tambien lo siguiente a `ProductValidation` que está en el backend, en la carpeta `controllers/validations`
+
+```JSX
+check('visibleUntil').optional().isDate().toDate(),
+  check('visibleUntil').custom((value, { req }) => {
+    const currentDate = new Date()
+    if (value && value < currentDate) {
+      return Promise.reject(new Error('The visibility must finish after the current date.'))
+    } else { return Promise.resolve() }
+  }),
+  check('availability').custom((value, { req }) => {
+    if (value === false && req.body.visibleUntil) {
+      return Promise.reject(new Error('Cannot set the availability and visibility at the same time.'))
+    } else { return Promise.resolve() }
+  })
+
+```
+Dentro de 
+```JSX
+const update = [
+  check('name').exists().isString().isLength({ min: 1, max: 255 }),
+  check('description').optional({ nullable: true, checkFalsy: true }).isString().isLength({ min: 1 }).trim(),
+  check('price').exists().isFloat({ min: 0 }).toFloat(),
+  check('order').default(null).optional({ nullable: true }).isInt().toInt(),
+  check('availability').optional().isBoolean().toBoolean(),
+  check('productCategoryId').exists().isInt({ min: 1 }).toInt(),
+  check('restaurantId').not().exists(),
+  check('image').custom((value, { req }) => {
+    return checkFileIsImage(req, 'image')
+  }).withMessage('Please upload an image with format (jpeg, png).'),
+  check('image').custom((value, { req }) => {
+    return checkFileMaxSize(req, 'image', maxFileSize)
+  }).withMessage('Maximum file size of ' + maxFileSize / 1000000 + 'MB'),
+  check('restaurantId').not().exists(),
+  // Solution
+  check('visibleUntil').optional().isDate().toDate(),
+  check('visibleUntil').custom((value, { req }) => {
+    const currentDate = new Date()
+    if (value && value < currentDate) {
+      return Promise.reject(new Error('The visibility must finish after the current date.'))
+    } else { return Promise.resolve() }
+  }),
+  check('availability').custom((value, { req }) => {
+    if (value === false && req.body.visibleUntil) {
+      return Promise.reject(new Error('Cannot set the availability and visibility at the same time.'))
+    } else { return Promise.resolve() }
+  })
+]
+```
+
+
+
+Añadir lo siguiente a `create-product` que está en el backend, en la carpeta `migrations`
+
+```JSX
+visibleUntil: {
+        type: Sequelize.DATE
+      },
+
+```
+Debajo de:
+```JSX
+order: {
+        type: Sequelize.INTEGER
+      },
+      availability: {
+        type: Sequelize.BOOLEAN
+      },
+```
+
+
+
+
+
+
+
+
+
+
+Añadir lo siguiente a `RestaurantValidation` que está en el backend, en la carpeta `controllers/validations`
+
+```JSX
+check('percentage').exists().isFloat({ min: -5, max: 5 }).toFloat(),
+```
+
+Dentro de 
+
+```JSX
+const update = [
+  check('name').exists().isString().isLength({ min: 1, max: 255 }).trim(),
+  check('description').optional({ nullable: true, checkFalsy: true }).isString().trim(),
+  check('address').exists().isString().isLength({ min: 1, max: 255 }).trim(),
+  check('postalCode').exists().isString().isLength({ min: 1, max: 255 }),
+
+  // Solution: exists validation depends on the implementation of the frontend. If percentage can be
+  // empty and no initial value is set in front, this property should be optional.
+  check('percentage').exists().isFloat({ min: -5, max: 5 }).toFloat(),
+
+  check('url').optional({ nullable: true, checkFalsy: true }).isString().isURL().trim(),
+  check('shippingCosts').exists().isFloat({ min: 0 }).toFloat(),
+  check('email').optional({ nullable: true, checkFalsy: true }).isString().isEmail().trim(),
+  check('phone').optional({ nullable: true, checkFalsy: true }).isString().isLength({ min: 1, max: 255 }).trim(),
+  check('restaurantCategoryId').exists({ checkNull: true }).isInt({ min: 1 }).toInt(),
+  check('userId').not().exists(),
+  check('heroImage').custom((value, { req }) => {
+    return checkFileIsImage(req, 'heroImage')
+  }).withMessage('Please upload an image with format (jpeg, png).'),
+  check('heroImage').custom((value, { req }) => {
+    return checkFileMaxSize(req, 'heroImage', maxFileSize)
+  }).withMessage('Maximum file size of ' + maxFileSize / 1000000 + 'MB'),
+  check('logo').custom((value, { req }) => {
+    return checkFileIsImage(req, 'logo')
+  }).withMessage('Please upload an image with format (jpeg, png).'),
+  check('logo').custom((value, { req }) => {
+    return checkFileMaxSize(req, 'logo', maxFileSize)
+  }).withMessage('Maximum file size of ' + maxFileSize / 1000000 + 'MB'),
+
+]
+```
+
+Añadir lo siguiente a `create-restaurant` que está en el backend, en la carpeta `database/migrations`
+
+```JSX
+percentage: {
+        type: Sequelize.DOUBLE,
+        defaultValue: 0.0
+      },
+```
+
+Debajo de 
+
+```JSX
+ status: {
+        type: Sequelize.ENUM,
+        values: [
+          'online',
+          'offline',
+          'closed',
+          'temporarily closed'
+        ],
+        defaultValue: 'offline'
+      },
+```
+
+
+Añadir a la carpeta `database/seeders` para agregar datos a nuestra base de datos en `ProductSeeders`.
+
+```JSX
+ basePrice: 2.5,
+```
+
+Dentro de 
+
+```JSX
+ { name: 'Ensaladilla', description: 'Tuna salad with mayonnaise', price: 2.5, basePrice: 2.5, image: process.env.PRODUCTS_FOLDER + '/ensaladilla.jpeg', order: 1, availability: true, restaurantId: 1, productCategoryId: 1 },
+        { name: 'Olives', description: 'Home made', price: 1.5, basePrice: 1.5, image: process.env.PRODUCTS_FOLDER + '/aceitunas.jpeg', order: 2, availability: true, restaurantId: 1, productCategoryId: 1 },
+```
+Asi en todos los datos
+
+
+
+
+Añadir lo siguiente a `Product` que está en el backend, en la carpeta `models`
+
+```JSX
+basePrice: DataTypes.DOUBLE,
+```
+
+Dentro de:
+
+```JSX
+Product.init({
+    name: DataTypes.STRING,
+    description: DataTypes.STRING,
+    price: DataTypes.DOUBLE,
+
+    // Solution
+    basePrice: DataTypes.DOUBLE,
+
+    image: DataTypes.STRING,
+    order: DataTypes.INTEGER,
+    availability: DataTypes.BOOLEAN,
+    restaurantId: DataTypes.INTEGER,
+    productCategoryId: DataTypes.INTEGER
+  }, {
+    sequelize,
+    modelName: 'Product'
+  })
+```
+
+
+Añadir lo siguiente a `Restaurant` que está en el backend, en la carpeta `models`
+
+```JSX
+percentage: {
+      type: DataTypes.DOUBLE,
+      defaultValue: 0.0
+    },
+```
+Dentro de:
+
+```JSX
+Restaurant.init({
+    name: {
+      allowNull: false,
+      type: DataTypes.STRING
+    },
+    description: DataTypes.TEXT,
+    address: {
+      allowNull: false,
+      type: DataTypes.STRING
+    },
+    postalCode: {
+      allowNull: false,
+      type: DataTypes.STRING
+    },
+    url: DataTypes.STRING,
+    shippingCosts: {
+      allowNull: false,
+      type: DataTypes.DOUBLE
+    },
+    averageServiceMinutes: DataTypes.DOUBLE,
+    email: DataTypes.STRING,
+    phone: DataTypes.STRING,
+    logo: DataTypes.STRING,
+    heroImage: DataTypes.STRING,
+    status: {
+      type: DataTypes.ENUM,
+      values: [
+        'online',
+        'offline',
+        'closed',
+        'temporarily closed'
+      ]
+    },
+
+
+    // Solution
+    percentage: {
+      type: DataTypes.DOUBLE,
+      defaultValue: 0.0
+    },
+
+
+    restaurantCategoryId: {
+      allowNull: false,
+      type: DataTypes.INTEGER
+    },
+    userId: {
+      allowNull: false,
+      type: DataTypes.INTEGER
+    },
+    createdAt: {
+      allowNull: false,
+      type: DataTypes.DATE,
+      defaultValue: new Date()
+    },
+    updatedAt: {
+      allowNull: false,
+      type: DataTypes.DATE,
+      defaultValue: new Date()
+    }
+  }, {
+    sequelize,
+    modelName: 'Restaurant'
+  })
+```
+
+
+
+
+# 2. Frontend
+
+
+Crear lo siguiente a `ConfirmationModal` que está en el frontend, en la carpeta `Components`
+
+```JSX
+// This file has been created for solution
+
+import React from 'react'
+import { Modal, Pressable, StyleSheet, View } from 'react-native'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import TextSemiBold from './TextSemibold'
+import * as GlobalStyles from '../styles/GlobalStyles'
+import TextRegular from './TextRegular'
+export default function ConfirmationModal(props) {
+  return (
+    <Modal
+      presentationStyle='overFullScreen'
+      animationType='slide'
+      transparent={true}
+      visible={props.isVisible}
+      onRequestClose={props.onCancel}>
+      <View style={styles.centeredView}>
+        <View style={styles.modalView}>
+          <TextSemiBold textStyle={{ fontSize: 15 }}>A corrective percentage will be applied to the price of this restaurant's products</TextSemiBold>
+          {props.children}
+          <Pressable
+            onPress={props.onCancel}
+            style={({ pressed }) => [
+              {
+                backgroundColor: pressed
+                  ? GlobalStyles.brandBlueTap
+                  : GlobalStyles.brandBlue
+              },
+              styles.actionButton
+            ]}>
+            <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
+              <MaterialCommunityIcons name='close' color={'white'} size={20} />
+              <TextRegular textStyle={styles.text}>
+                Cancel
+              </TextRegular>
+            </View>
+          </Pressable>
+          <Pressable
+            onPress={props.onConfirm}
+            style={({ pressed }) => [
+              {
+                backgroundColor: pressed
+                  ? GlobalStyles.brandPrimaryTap
+                  : GlobalStyles.brandPrimary
+              },
+              styles.actionButton
+            ]}>
+            <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
+              <MaterialCommunityIcons name='check-outline' color={'white'} size={20} />
+              <TextRegular textStyle={styles.text}>
+                Confirm
+              </TextRegular>
+            </View>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+const styles = StyleSheet.create({
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 22
+  },
+  modalView: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowOffset: {
+      width: 0,
+      height: 2
+    },
+    shadowOpacity: 0.75,
+    shadowRadius: 4,
+    elevation: 5,
+    width: '90%'
+  },
+  actionButton: {
+    borderRadius: 8,
+    height: 40,
+    marginTop: 12,
+    margin: '1%',
+    padding: 10,
+    alignSelf: 'center',
+    flexDirection: 'column',
+    width: '50%'
+  },
+  text: {
+    fontSize: 16,
+    color: 'white',
+    alignSelf: 'center',
+    marginLeft: 5
+  }
+})
+```
+
+
+
+Añadir lo siguiente a `CreateRestaurantScreen` que está en el frontend, en la carpeta `screens/restaurants`
+
+```JSX
+percentage
+import { create, getRestaurantCategories, percentage } from '../../api/RestaurantEndpoints'
+
+percentage: 0
+const initialRestaurantValues = { name: null, description: null, address: null, postalCode: null, url: null, shippingCosts: null, email: null, phone: null, restaurantCategoryId: null, percentage: 0 }
+```
+
+Añadir lo siguiente a `EditRestaurantScreen` que está en el frontend, en la carpeta `screens/restaurants`
+
+```JSX
+import ConfirmationModal from '../../components/ConfirmationModal'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import TextSemiBold from '../../components/TextSemibold'
+```
+
+Y añadir tambien lo siguiente a `EditRestaurantScreen` que está en el frontend, en la carpeta `screens/restaurants`
+
+```JSX
+percentage: 0
+const [initialRestaurantValues, setInitialRestaurantValues] = useState({ name: null, description: null, address: null, postalCode: null, url: null, shippingCosts: null, email: null, phone: null, restaurantCategoryId: null, logo: null, heroImage: null, percentage: 0 })
+  const [percentageShowDialog, setPercentageShowDialog] = useState(false)
+
+Dentro del yup
+ percentage: yup
+      .number()
+      .max(5)
+      .min(-5)
+
+
+const updateRestaurant = async (values) => {
+    setBackendErrors([])
+
+    // Solution
+    if (values.percentage != 0 && !percentageShowDialog) {
+      setPercentageShowDialog(true)
+    } else {
+      // Solution
+      setPercentageShowDialog(false)
+
+      try {
+        const updatedRestaurant = await update(restaurant.id, values)
+        showMessage({
+          message: `Restaurant ${updatedRestaurant.name} succesfully updated`,
+          type: 'success',
+          style: GlobalStyles.flashStyle,
+          titleStyle: GlobalStyles.flashTextStyle
+        })
+        navigation.navigate('RestaurantsScreen', { dirty: true })
+      } catch (error) {
+        console.log(error)
+        setBackendErrors(error.errors)
+      }
+    }
+  }
+
+```
+
+Y añadir tambien lo siguiente a `EditRestaurantScreen` que está en el frontend, en la carpeta `screens/restaurants` dentro del formik
+```JSX
+<View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 20, marginBottom: 10 }} >
+                <Pressable onPress={() => {
+                  let newPercentage = values.percentage + 0.5
+                  if (newPercentage < 5)
+                    setFieldValue('percentage', newPercentage)
+                }}>
+                  <MaterialCommunityIcons
+                    name={'arrow-up-circle'}
+                    color={GlobalStyles.brandSecondaryTap}
+                    size={40}
+                  />
+                </Pressable>
+
+                <TextSemiBold>Porcentaje actual: <TextSemiBold textStyle={{ color: GlobalStyles.brandPrimary }}>{values.percentage.toFixed(1)}%</TextSemiBold></TextSemiBold>
+
+                <Pressable onPress={() => {
+                  let newPercentage = values.percentage - 0.5
+                  if (newPercentage > -5)
+                    setFieldValue('percentage', newPercentage)
+                }}>
+                  <MaterialCommunityIcons
+                    name={'arrow-down-circle'}
+                    color={GlobalStyles.brandSecondaryTap}
+                    size={40}
+                  />
+                </Pressable>
+              </View>
+
+
+
+Al final del formik
+
+<ConfirmationModal
+            isVisible={percentageShowDialog}
+            onCancel={() => setPercentageShowDialog(false)}
+            onConfirm={() => updateRestaurant(values)}>
+          </ConfirmationModal>
+```
+
+
+
+
+Añadir lo siguiente a `RestaurantScreen` que está en el frontend, en la carpeta `screens/restaurants`
+
+```JSX
+{item.percentage != 0 && <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }} >
+          <TextSemiBold textStyle={{ color: item.percentage > 0 ? 'red' : 'green' }}>{item.percentage > 0 ? '¡Incremento de precios aplicados!' : '¡Descuentos aplicados!'}</TextSemiBold>
+        </View>
+        }
+```
+
+Debajo de 
+
+```JSX
+<TextRegular numberOfLines={2}>{item.description}</TextRegular>
+        {item.averageServiceMinutes !== null &&
+          <TextSemiBold>Avg. service time: <TextSemiBold textStyle={{ color: GlobalStyles.brandPrimary }}>{item.averageServiceMinutes} min.</TextSemiBold></TextSemiBold>
+        }
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }} >
+          <TextSemiBold>Shipping: <TextSemiBold textStyle={{ color: GlobalStyles.brandPrimary }}>{item.shippingCosts.toFixed(2)}€</TextSemiBold></TextSemiBold>
+        </View>
+```
+
+Encima de 
+
+```JSX
+<View style={styles.actionButtonsContainer}>
+          <Pressable
+            onPress={() => navigation.navigate('EditRestaurantScreen', { id: item.id })}
+            style={({ pressed }) => [
+              {
+                backgroundColor: pressed ? GlobalStyles.brandBlueTap : GlobalStyles.brandBlue
+              },
+              styles.actionButton
+            ]}
+          >
+            <View style={[{ flex: 1, flexDirection: 'row', justifyContent: 'center' }]}>
+              <MaterialCommunityIcons name='pencil' color={'white'} size={20} />
+              <TextRegular textStyle={styles.text}>Edit</TextRegular>
+            </View>
+          </Pressable>
+```
