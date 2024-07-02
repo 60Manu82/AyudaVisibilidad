@@ -1,4 +1,4 @@
-# 1. Promocionar un restaurante
+# 1. Visibilidad 
 
 Añadir lo siguiente a `RestaurantController` que está en el backend, en la carpeta `controllers`
 
